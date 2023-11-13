@@ -37,7 +37,7 @@ int main() {
 
     // Bind the listen socket to the server address
     if (bind(listen_sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
-        perror("Bind failed");
+        perror("Bind failed: listen");
         close(listen_sockfd);
         return 1;
     }
@@ -48,12 +48,60 @@ int main() {
     client_addr_to.sin_addr.s_addr = inet_addr(LOCAL_HOST);
     client_addr_to.sin_port = htons(CLIENT_PORT_TO);
 
+
     // Open the target file for writing (always write to output.txt)
     FILE *fp = fopen("output.txt", "wb");
 
     // TODO: Receive file from the client and save it as output.txt
+    if (listen(listen_sockfd, 10) == -1) {
+        perror("listen failed");
+        close(listen_sockfd);
+        exit(EXIT_FAILURE);
+    }
 
-    
+    //printf("Server listening on port %d\n", app.server_port);
+
+    socklen_t client_len;
+    while (1) {
+        int client_socket = accept(listen_sockfd, (struct sockaddr*)&client_addr_to, &client_len);
+        if (client_socket == -1) {
+            perror("accept failed");
+            continue;
+        }
+        
+        //printf("Accepted connection from %s:%d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+        //handle_request(&app, client_socket);
+        char buffer[PAYLOAD_SIZE];
+        ssize_t bytes_read;
+        struct packet pkt;
+
+        if (bytes_read = recv(client_socket, (void *) &pkt, sizeof(pkt), 0) > 0) {
+            printRecv(&pkt);
+
+            // if seq number is prev_ack's next or starting new file
+            if(prev_ack==-1 || pkt.seqnum == next_ack[prev_ack])
+            {
+                // copy current content to 
+                char payload[PAYLOAD_SIZE];
+                unsigned int length = pkt.length;
+                memcpy(payload, pkt.payload, length);
+                fwrite(payload, length, 1, fp);
+
+                // send ack number back 
+                ack_pkt.acknum = pkt.acknum;
+                prev_ack = ack_pkt.acknum;
+                send(send_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0); 
+            }
+            else{
+                // send ack number back 
+                send(send_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0); 
+            }
+        }
+
+
+        //buffer[bytes_read] = '\0';
+        //close(client_socket);
+    }   
 
     fclose(fp);
     close(listen_sockfd);
