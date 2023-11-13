@@ -53,29 +53,16 @@ int main() {
     FILE *fp = fopen("output.txt", "wb");
 
     // TODO: Receive file from the client and save it as output.txt
-    if (listen(listen_sockfd, 10) == -1) {
-        perror("listen failed");
-        close(listen_sockfd);
-        exit(EXIT_FAILURE);
-    }
+    
 
-    //printf("Server listening on port %d\n", app.server_port);
-
-    socklen_t client_len;
     while (1) {
-        int client_socket = accept(listen_sockfd, (struct sockaddr*)&client_addr_to, &client_len);
-        if (client_socket == -1) {
-            perror("accept failed");
-            continue;
-        }
         
-        //printf("Accepted connection from %s:%d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
-        //handle_request(&app, client_socket);
         char buffer[PAYLOAD_SIZE];
         ssize_t bytes_read;
         struct packet pkt;
+    
 
-        if (bytes_read = recv(client_socket, (void *) &pkt, sizeof(pkt), 0) > 0) {
+        if (bytes_read = recvfrom(listen_sockfd, (void *) &pkt, sizeof(pkt), 0, &server_addr, sizeof(server_addr)) > 0) {
             printRecv(&pkt);
 
             // if seq number is prev_ack's next or starting new file
@@ -90,11 +77,11 @@ int main() {
                 // send ack number back 
                 ack_pkt.acknum = pkt.acknum;
                 prev_ack = ack_pkt.acknum;
-                send(send_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0); 
+                sendto(send_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0, &client_addr_to, sizeof(client_addr_to));
             }
             else{
                 // send ack number back 
-                send(send_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0); 
+                sendto(send_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0, &client_addr_to, sizeof(client_addr_to));
             }
         }
 
