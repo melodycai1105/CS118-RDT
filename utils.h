@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+
 // MACROS
 #define SERVER_IP "127.0.0.1"
 #define LOCAL_HOST "127.0.0.1"
@@ -17,16 +18,19 @@
 #define MAX_SEQUENCE 1024
 
 
+// ack number next
+int next_ack[] = {1,2,0};
+int prev_ack = -1;
 
 // Packet Layout
 // You may change this if you want to
 struct packet {
-    unsigned short seqnum;
-    unsigned short acknum;
-    char ack;
-    char last;
-    unsigned int length;
-    char payload[PAYLOAD_SIZE];
+    unsigned short seqnum;  // 2bytes
+    unsigned short acknum; // 2bytes
+    char ack; // 1byte
+    char last; // 1byte
+    unsigned int length; // 4bytes 
+    char payload[PAYLOAD_SIZE];  // 1024 byres
 };
 
 // Utility function to build a packet
