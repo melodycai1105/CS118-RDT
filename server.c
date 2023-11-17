@@ -7,6 +7,7 @@
 #include "utils.h"
 
 int main() {
+    
     int listen_sockfd, send_sockfd;
     struct sockaddr_in server_addr, client_addr_from, client_addr_to;
     struct packet buffer;
@@ -48,43 +49,48 @@ int main() {
     client_addr_to.sin_addr.s_addr = inet_addr(LOCAL_HOST);
     client_addr_to.sin_port = htons(CLIENT_PORT_TO);
 
-
+    
     // Open the target file for writing (always write to output.txt)
     FILE *fp = fopen("output.txt", "wb");
 
     // TODO: Receive file from the client and save it as output.txt
+   //printf("bad ack number");
     
-
     while (1) {
         
-        char buffer[PAYLOAD_SIZE];
         ssize_t bytes_read;
         struct packet pkt;
-    
 
-        if (bytes_read = recvfrom(listen_sockfd, (void *) &pkt, sizeof(pkt), 0, &server_addr, sizeof(server_addr)) > 0) {
-            printRecv(&pkt);
+      
+
+        if (bytes_read = recvfrom(listen_sockfd, &pkt, sizeof(pkt), 0, (struct sockaddr*)&server_addr, &addr_size) > 0) {
+            
+            //printRecv(&pkt);
 
             // if seq number is prev_ack's next or starting new file
             if(prev_ack==-1 || pkt.seqnum == next_ack[prev_ack])
             {
+                printf("good seq number: %d prev ack: %d\n", pkt.seqnum, prev_ack);
                 // copy current content to 
                 char payload[PAYLOAD_SIZE];
                 unsigned int length = pkt.length;
+
                 memcpy(payload, pkt.payload, length);
+
                 fwrite(payload, length, 1, fp);
 
                 // send ack number back 
-                ack_pkt.acknum = pkt.acknum;
+                ack_pkt.acknum = pkt.seqnum;
                 prev_ack = ack_pkt.acknum;
                 sendto(send_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0, &client_addr_to, sizeof(client_addr_to));
             }
             else{
                 // send ack number back 
                 sendto(send_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0, &client_addr_to, sizeof(client_addr_to));
+                printf("bad seq number: %d\n", pkt.seqnum);
             }
         }
-
+        delay(1);
 
         //buffer[bytes_read] = '\0';
         //close(client_socket);
