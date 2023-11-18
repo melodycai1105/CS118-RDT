@@ -61,9 +61,7 @@ int main() {
         ssize_t bytes_read;
         struct packet pkt;
 
-      
-
-        if (bytes_read = recvfrom(listen_sockfd, &pkt, sizeof(pkt), 0, (struct sockaddr*)&server_addr, &addr_size) > 0) {
+        if (bytes_read = recvfrom(listen_sockfd, (void *) &pkt, sizeof(pkt), 0, (struct sockaddr*)&server_addr, &addr_size) > 0) {
             
             //printRecv(&pkt);
 
@@ -72,12 +70,12 @@ int main() {
             {
                 printf("good seq number: %d prev ack: %d\n", pkt.seqnum, prev_ack);
                 // copy current content to 
-                char payload[PAYLOAD_SIZE];
-                unsigned int length = pkt.length;
+                // char payload[PAYLOAD_SIZE];
+                // unsigned int length = pkt.length;
 
-                memcpy(payload, pkt.payload, length);
+                // memcpy(payload, pkt.payload, length);
 
-                fwrite(payload, length, 1, fp);
+                fwrite(pkt.payload, 1, pkt.length, fp);
 
                 // send ack number back 
                 ack_pkt.acknum = pkt.seqnum;
@@ -91,11 +89,10 @@ int main() {
             }
         }
         delay(1);
-
         //buffer[bytes_read] = '\0';
         //close(client_socket);
     }   
-
+    // fwrite('\0', 1, 1, fp);
     fclose(fp);
     close(listen_sockfd);
     close(send_sockfd);

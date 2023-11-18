@@ -9,7 +9,7 @@
 
 
 int main(int argc, char *argv[]) {
-    int listen_sockfd, send_sockfd, client_sockfd;
+    int listen_sockfd, send_sockfd;
     struct sockaddr_in client_addr, server_addr_to, server_addr_from;
     socklen_t addr_size = sizeof(server_addr_to);
     struct timeval tv;
@@ -95,23 +95,35 @@ int main(int argc, char *argv[]) {
         // TODO: Read from file, and initiate reliable data transfer to the server
     ssize_t bytes_read;
     ssize_t bytes_sent;
-    while((bytes_read = fread(buffer, 1, PAYLOAD_SIZE-1, fp))> 0){
-        buffer[bytes_read] = '\0';
-        //printf("%s", buffer);
-        build_packet(&pkt, seq_num, ack_num, last, ack, bytes_read + 1, (const char*) buffer);
+    tv.tv_usec = 100;
+    // FILE *wfp = fopen("output.txt", "wb");
+    while((bytes_read = fread(buffer, 1, PAYLOAD_SIZE, fp))> 0){
+        if (bytes_read < PAYLOAD_SIZE){
+            last = 1;
+        }
+
+        build_packet(&pkt, seq_num, ack_num, last, ack, bytes_read, (const char*) buffer);
         //printf("%s", pkt.payload);
-        printf("size:%d",bytes_read);
+        printf("size:%d ",bytes_read);
+
+        // fwrite(pkt.payload, 1, pkt.length, wfp);
+        // printf("%s", pkt.payload);
+        // empty the buffer
+        memset(buffer, 0, sizeof(buffer));
         
         bytes_sent = sendto(send_sockfd, (void *) &pkt, sizeof(pkt), 0, (struct sockaddr*)&server_addr_to, sizeof(server_addr_to));
         if(bytes_sent>0)
             printf("right: %d\n",bytes_sent);
-        
-        recvfrom(listen_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0, (struct sockaddr*)&client_addr, &addr_size);
-        while (ack_pkt.acknum != next_ack[seq_num]){
-            printf("ack num:%d",ack_pkt.acknum);
+
+        // set the timeout value
+        setsockopt(listen_sockfd, SOL_SOCKET, SO_RCVTIMEO, (struct timeval *)&tv, sizeof(tv));                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        
+        ssize_t bytes_received = recvfrom(listen_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0, (struct sockaddr*)&client_addr, &addr_size);
+        // // while (1){
+        while (!(bytes_received >= 0) || ack_pkt.acknum != next_ack[seq_num]){
+        // printf("ack num:%d",ack_pkt.acknum);
             sendto(send_sockfd, (void *) &pkt, sizeof(pkt), 0, (struct sockaddr*)&server_addr_to, sizeof(server_addr_to));
-            recvfrom(listen_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0, (struct sockaddr*)&client_addr, &addr_size);
-        }
+            bytes_received = recvfrom(listen_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0, (struct sockaddr*)&client_addr, &addr_size);
+        } 
         // ssize_t read;
         // while ((read = recv(client_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0)) <= 0){
         //     if (read < 0){
