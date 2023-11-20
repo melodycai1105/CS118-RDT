@@ -64,27 +64,36 @@ int main() {
         if (bytes_read = recvfrom(listen_sockfd, (void *) &pkt, sizeof(pkt), 0, (struct sockaddr*)&server_addr, &addr_size) > 0) {
             
             //printRecv(&pkt);
+            //printf("last char: %c", pkt.last);
 
             // if seq number is prev_ack's next or starting new file
             if(prev_ack==-1 || pkt.seqnum == next_ack[prev_ack])
             {
                 printf("good seq number: %d\n", pkt.seqnum, prev_ack);
+                printf("last char: %c", pkt.last);
                 // memcpy(payload, pkt.payload, length);
 
                 fwrite(pkt.payload, 1, pkt.length, fp);
-
+                
                 // send ack number back 
+                if(pkt.last=='t')
+                {
+                    printf("last packet");
+                    ack_pkt.last='d';
+                    printf(pkt.payload);
+                }
                 ack_pkt.acknum = pkt.seqnum;
                 prev_ack = ack_pkt.acknum;
                 sendto(send_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0, &client_addr_to, sizeof(client_addr_to));
             }
             else{
                 // send ack number back 
+                ack_pkt.acknum = pkt.seqnum;
                 sendto(send_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0, &client_addr_to, sizeof(client_addr_to));
-                printf("bad seq number: %d,expect: %d\n", pkt.seqnum,next_ack[prev_ack]);
+                //printf("bad seq number: %d,expect: %d\n", pkt.seqnum,next_ack[prev_ack]);
             }
         }
-        delay(1000);
+        //delay(2000);
         //buffer[bytes_read] = '\0';
         //close(client_socket);
         
