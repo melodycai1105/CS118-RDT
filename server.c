@@ -69,19 +69,24 @@ int main() {
             // if seq number is prev_ack's next or starting new file
             if(prev_ack==-1 || pkt.seqnum == next_ack[prev_ack])
             {
-                printf("good seq number: %d\n", pkt.seqnum, prev_ack);
-                printf("last char: %c", pkt.last);
+                printf("good seq number: %d\n", pkt.seqnum);
+                //printf("last char: %c", pkt.last);
                 // memcpy(payload, pkt.payload, length);
 
-                fwrite(pkt.payload, 1, pkt.length, fp);
+                //printf("bytes write: %d\n", bytes_write);
+                //printf(pkt.payload);
                 
                 // send ack number back 
                 if(pkt.last=='t')
                 {
+                    fwrite(pkt.payload, 1, pkt.length-1, fp);
                     printf("last packet");
                     ack_pkt.last='d';
-                    printf(pkt.payload);
+                    fclose(fp);
+                    break;
+                    //printf(pkt.payload);
                 }
+                fwrite(pkt.payload, 1, pkt.length, fp);
                 ack_pkt.acknum = pkt.seqnum;
                 prev_ack = ack_pkt.acknum;
                 sendto(send_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0, &client_addr_to, sizeof(client_addr_to));

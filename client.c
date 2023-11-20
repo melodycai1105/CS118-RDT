@@ -126,7 +126,6 @@ int main(int argc, char *argv[]) {
     fp = fopen(filename, "rb");
 
     // BATCH: construct and send initial array of packets 
-    //deque<int> packets_in_window;
     struct packet packets_in_window[window_size];
     for(int i = 0; i<window_size; i++)
     {   
@@ -155,8 +154,6 @@ int main(int argc, char *argv[]) {
 
     }
     
-    //delay(1000);
-    printf("here\n");
 
     while(bytes_received = recvfrom(listen_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0, (struct sockaddr*)&client_addr, &addr_size)>0)
     {
@@ -172,7 +169,6 @@ int main(int argc, char *argv[]) {
         // if start of window ack received, slide window
         if(ack_pkt.acknum==start_seq)
         {
-            //printf("match\n");
             memset(buffer, 0, sizeof(buffer));
             
             // slide window
@@ -188,12 +184,14 @@ int main(int argc, char *argv[]) {
             if (num_packets<0 && empty==false)
             {
                 bytes_read = fread(buffer,1,last_packet_len,fp);
-                printf("last packet read\nbytes_read:%d\n", bytes_read);
+                buffer[last_packet_len]='\0';
+                //printf(buffer);
+                //printf("last packet read\nbytes_read:%d\n", bytes_read);
                 empty = true;
-                build_packet(&pkt, seq_num, ack_num, 't', ack, bytes_read, (const char*) buffer);
+                build_packet(&pkt, seq_num, ack_num, 't', ack, last_packet_len+1, (const char*) buffer);
                 sendto(send_sockfd, (void *) &pkt, sizeof(pkt), 0, (struct sockaddr*)&server_addr_to, sizeof(server_addr_to));
-                printf(pkt.payload);
-                printf(pkt.last);
+                //printf(pkt.payload);
+                //printf(pkt.last);
             }
             // keep reading and sending if more is available
             else if (num_packets>0)
@@ -206,7 +204,7 @@ int main(int argc, char *argv[]) {
                 memset(buffer, 0, sizeof(buffer));
 
                 bytes_sent = sendto(send_sockfd, (void *) &pkt, sizeof(pkt), 0, (struct sockaddr*)&server_addr_to, sizeof(server_addr_to));
-                //printf("bytes_send: %d seq:%d\n",bytes_sent,seq_num);
+                printf("bytes_send: %d seq:%d\n",bytes_sent,seq_num);
 
                 // increment seq num                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
                 seq_num = next_seq[seq_num];
@@ -220,7 +218,6 @@ int main(int argc, char *argv[]) {
             
             for(int i = 0; i<valid_size; i++)
             {
-                // send packet if not null
                 struct packet p = packets_in_window[i];
                 bytes_sent = sendto(send_sockfd, (void *) &p, sizeof(p), 0, (struct sockaddr*)&server_addr_to, sizeof(server_addr_to));
                 //printf("bytes_send: %d seq:%d\n",bytes_sent,p.seqnum);
