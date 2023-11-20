@@ -20,8 +20,11 @@
 
 
 // ack number next
-int next_ack[] = {1,2,0};
+int next_ack[] = {1,2,3,0};
 int prev_ack = -1;
+
+// window size
+int window_size = 3;
 
 // Packet Layout
 // You may change this if you want to

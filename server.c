@@ -68,11 +68,7 @@ int main() {
             // if seq number is prev_ack's next or starting new file
             if(prev_ack==-1 || pkt.seqnum == next_ack[prev_ack])
             {
-                printf("good seq number: %d prev ack: %d\n", pkt.seqnum, prev_ack);
-                // copy current content to 
-                // char payload[PAYLOAD_SIZE];
-                // unsigned int length = pkt.length;
-
+                printf("good seq number: %d\n", pkt.seqnum, prev_ack);
                 // memcpy(payload, pkt.payload, length);
 
                 fwrite(pkt.payload, 1, pkt.length, fp);
@@ -85,12 +81,13 @@ int main() {
             else{
                 // send ack number back 
                 sendto(send_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0, &client_addr_to, sizeof(client_addr_to));
-                printf("bad seq number: %d\n", pkt.seqnum);
+                printf("bad seq number: %d,expect: %d\n", pkt.seqnum,next_ack[prev_ack]);
             }
         }
-        delay(1);
+        delay(1000);
         //buffer[bytes_read] = '\0';
         //close(client_socket);
+        
     }   
     // fwrite('\0', 1, 1, fp);
     fclose(fp);
