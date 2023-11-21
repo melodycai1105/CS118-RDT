@@ -15,6 +15,8 @@ int main() {
     int expected_seq_num = 0;
     int recv_len;
     struct packet ack_pkt;
+    // ack_pct ack num default to -1
+    ack_pkt.acknum = -1;
 
     // Create a UDP socket for sending
     send_sockfd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -92,10 +94,13 @@ int main() {
                 sendto(send_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0, &client_addr_to, sizeof(client_addr_to));
             }
             else{
-                // send ack number back 
+                // send previous ack number back 
+                //sendto(send_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0, &client_addr_to, sizeof(client_addr_to));
+
+                // send most recent seq as ack
                 ack_pkt.acknum = pkt.seqnum;
                 sendto(send_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0, &client_addr_to, sizeof(client_addr_to));
-                //printf("bad seq number: %d,expect: %d\n", pkt.seqnum,next_ack[prev_ack]);
+                printf("bad seq number: %d,expect: %d\n", pkt.seqnum,next_ack[prev_ack]);
             }
         }
         //delay(2000);
