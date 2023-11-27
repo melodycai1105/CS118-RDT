@@ -71,7 +71,7 @@ int main() {
             // if seq number is prev_ack's next or starting new file
             if(prev_ack==-1 || pkt.seqnum == next_ack[prev_ack])
             {
-                printf("good seq number: %d\n", pkt.seqnum);
+                // printf("good seq number: %d\n", pkt.seqnum);
                 //printf("last char: %c", pkt.last);
                 // memcpy(payload, pkt.payload, length);
 
@@ -82,10 +82,15 @@ int main() {
                 if(pkt.last=='t')
                 {
                     fwrite(pkt.payload, 1, pkt.length-1, fp);
-                    printf("last packet");
                     ack_pkt.last='d';
+                    ack_pkt.acknum = pkt.seqnum;
+                    prev_ack = ack_pkt.acknum;
+                    sendto(send_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0, &client_addr_to, sizeof(client_addr_to));
+                    printf("last packet\n");
                     fclose(fp);
-                    break;
+                    close(listen_sockfd);
+                    close(send_sockfd);
+                    return EXIT_SUCCESS;
                     //printf(pkt.payload);
                 }
                 fwrite(pkt.payload, 1, pkt.length, fp);
@@ -98,9 +103,9 @@ int main() {
                 //sendto(send_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0, &client_addr_to, sizeof(client_addr_to));
 
                 // send most recent seq as ack
-                ack_pkt.acknum = pkt.seqnum;
+                ack_pkt.acknum = prev_ack;
                 sendto(send_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0, &client_addr_to, sizeof(client_addr_to));
-                printf("bad seq number: %d,expect: %d\n", pkt.seqnum,next_ack[prev_ack]);
+                // printf("bad seq number: %d,expect: %d\n", ack_pkt.acknum,next_ack[prev_ack]);
             }
         }
         //delay(2000);
@@ -109,8 +114,8 @@ int main() {
         
     }   
     // fwrite('\0', 1, 1, fp);
-    fclose(fp);
-    close(listen_sockfd);
-    close(send_sockfd);
-    return 0;
+    // fclose(fp);
+    // close(listen_sockfd);
+    // close(send_sockfd);
+    // return 0;
 }
