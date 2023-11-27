@@ -173,12 +173,12 @@ int main(int argc, char *argv[]) {
         // if timeout, resend
         if (bytes_received = recvfrom(listen_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0, (struct sockaddr*)&client_addr, &addr_size)<0)
         {
-            printf("timeout\n");
+            //printf("timeout\n");
             for(int i = 0; i<valid_size; i++)
             {
                 struct packet p = packets_in_window[i];
                 bytes_sent = sendto(send_sockfd, (void *) &p, sizeof(p), 0, (struct sockaddr*)&server_addr_to, sizeof(server_addr_to));
-                //printf("bytes_send: %d seq:%d\n",bytes_sent,p.seqnum);
+                printf("timeout!!bytes_send: %d seq:%d\n",bytes_sent,p.seqnum);
             }
         }
         // if no timeout, check ack number
