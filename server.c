@@ -94,6 +94,7 @@ int main() {
                     //printf(pkt.payload);
                 }
                 fwrite(pkt.payload, 1, pkt.length, fp);
+                
                 ack_pkt.acknum = pkt.seqnum;
                 prev_ack = ack_pkt.acknum;
                 sendto(send_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0, &client_addr_to, sizeof(client_addr_to));
@@ -103,9 +104,10 @@ int main() {
                 //sendto(send_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0, &client_addr_to, sizeof(client_addr_to));
 
                 // send most recent seq as ack
+                printf("bad seq number: %d,expect: %d\n", pkt.seqnum,next_ack[prev_ack]);
                 ack_pkt.acknum = pkt.seqnum;
                 sendto(send_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0, &client_addr_to, sizeof(client_addr_to));
-                printf("bad seq number: %d,expect: %d\n", ack_pkt.acknum,next_ack[prev_ack]);
+
             }
         }
         //delay(2000);
