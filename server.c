@@ -69,14 +69,14 @@ int main() {
             //printf("last char: %c", pkt.last);
 
             // if seq number is prev_ack's next or starting new file
-            if(prev_ack==-1 || pkt.seqnum == next_ack[prev_ack])
+            if(prev_ack==-1 && pkt.seqnum==0 || pkt.seqnum == next_ack[prev_ack])
             {
                 printf("good seq number: %d\n", pkt.seqnum);
                 //printf("last char: %c", pkt.last);
                 // memcpy(payload, pkt.payload, length);
 
                 //printf("bytes write: %d\n", bytes_write);
-                //printf(pkt.payload);
+                printf(pkt.payload);
                 
                 // send ack number back 
                 if(pkt.last=='t')
@@ -110,7 +110,7 @@ int main() {
 
             }
         }
-        //delay(2000);
+        delay(1);
         //buffer[bytes_read] = '\0';
         //close(client_socket);
         

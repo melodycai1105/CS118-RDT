@@ -163,6 +163,8 @@ int main(int argc, char *argv[]) {
         if (select(listen_sockfd+1, &read_fds, NULL, NULL, &tv) == 0)
         //if(bytes_received = recvfrom(listen_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0, (struct sockaddr*)&client_addr, &addr_size)<0)
         {
+
+            printf("timeout\n");
             //tv.tv_sec = 0;
             tv.tv_sec = 1;
             setsockopt(listen_sockfd, SOL_SOCKET, SO_RCVTIMEO, (struct timeval *)&tv, sizeof(tv)); 
@@ -244,8 +246,7 @@ int main(int argc, char *argv[]) {
                 //tv.tv_sec = TIMEOUT;
             }
         }
-        //delay(2000);
+        delay(1);
         
     }
 }
-    
