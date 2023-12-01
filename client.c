@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <time.h>
 #include <stdbool.h>
+#include <fcntl.h>
 
 #include "utils.h"
 
@@ -20,7 +21,8 @@ int main(int argc, char *argv[]) {
     unsigned short ack_num = 0;
     char last = 0;
     char ack = 0;
-    int next_seq [] = {1, 2, 3, 0};
+    int next_seq [] = {1,2,3,4,5,0};
+    double startTime;
     // int next_ack [] = {0, 1, 2, };
     // int prev_seq [] = {3, 0, 1, 2};
 
@@ -78,10 +80,6 @@ int main(int argc, char *argv[]) {
     ssize_t bytes_sent;
     ssize_t bytes_received;
 
-    // set the timeout value
-    tv.tv_usec = 1000;
-    // setsockopt(listen_sockfd, SOL_SOCKET, SO_RCVTIMEO, (struct timeval *)&tv, sizeof(tv)); 
-    // FILE *wfp = fopen("output.txt", "wb");
 
     // BATCH: declare window size, start and end pointer
     int valid_size = 0;
@@ -99,9 +97,8 @@ int main(int argc, char *argv[]) {
     }
 
     long int last_packet_len = len % PAYLOAD_SIZE;
-    // round up number of packets
-    long int num_packets = len/PAYLOAD_SIZE + (len % PAYLOAD_SIZE != 0);
-    printf("last packet len: %d, num of packets:%d", last_packet_len,num_packets);
+    long int num_packets = len/PAYLOAD_SIZE; //+ (len % PAYLOAD_SIZE != 0);
+    //printf("last packet len: %d, num of packets:%d", last_packet_len,num_packets);
     close(fp);
     fp = fopen(filename, "rb");
 
@@ -113,8 +110,10 @@ int main(int argc, char *argv[]) {
         // set timer for first packet
         if (i==0)
         {
-            tv.tv_sec = 1;
+            //tv.tv_sec = TIMEOUT;
             //setsockopt(listen_sockfd, SOL_SOCKET, SO_RCVTIMEO, (struct timeval *)&tv, sizeof(tv)); 
+            startTime = setStartTime();
+            //printf("startTime:%d\n", startTime);
         }
         bytes_read = fread(buffer, 1, PAYLOAD_SIZE, fp);
 
@@ -137,6 +136,7 @@ int main(int argc, char *argv[]) {
         build_packet(&pkt, seq_num, ack_num, last, ack, bytes_read, (const char*) buffer);
         packets_in_window[i] = pkt;
         valid_size += 1;
+        //printf("valid size:%d", valid_size);
         memset(buffer, 0, sizeof(buffer));
 
         // send packet
@@ -146,7 +146,7 @@ int main(int argc, char *argv[]) {
 
         // increment seq num                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
         seq_num = next_seq[seq_num];
-        printf("index:%d\n", i);
+        //printf("index:%d\n", i);
     }
     
     // fd set
@@ -154,33 +154,21 @@ int main(int argc, char *argv[]) {
     FD_ZERO(&read_fds);
     FD_SET(listen_sockfd, &read_fds);
 
-    tv.tv_sec = 1;
+    // set listen socket as non blocking
+    fcntl(listen_sockfd, F_SETFL, O_NONBLOCK);
+
     while (1){
-        //printf("in loop, valid size: %d \n", valid_size);
 
 
-        // if timeout, resend
-        if (select(listen_sockfd+1, &read_fds, NULL, NULL, &tv) == 0)
-        //if(bytes_received = recvfrom(listen_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0, (struct sockaddr*)&client_addr, &addr_size)<0)
-        {
-
-            printf("timeout\n");
-            //tv.tv_sec = 0;
-            tv.tv_sec = 1;
-            setsockopt(listen_sockfd, SOL_SOCKET, SO_RCVTIMEO, (struct timeval *)&tv, sizeof(tv)); 
-            for(int i = 0; i<valid_size; i++)
-            {
-                struct packet p = packets_in_window[i];
-                bytes_sent = sendto(send_sockfd, (void *) &p, sizeof(p), 0, (struct sockaddr*)&server_addr_to, sizeof(server_addr_to));
-                printf("timeout!!bytes_send: %d seq:%d\n",bytes_sent,p.seqnum);
-            }
-        }
         // if no timeout, check ack number
         if (bytes_received = recvfrom(listen_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0, (struct sockaddr*)&client_addr, &addr_size)>0){
+
+            //printf("receiving something");
             // if last packet is acked, finish 
+            // can change big while loop to while(num_packets>=0)
             if(ack_pkt.last=='d')
             {
-                printf("last packet acked, acknum:%d \n", ack_pkt.acknum);
+                //printf("last packet acked, acknum:%d \n", ack_pkt.acknum);
                 close(fp);
                 close(listen_sockfd);
                 close(send_sockfd);
@@ -190,63 +178,76 @@ int main(int argc, char *argv[]) {
             // if wrong ack number, do nothing
             if(ack_pkt.acknum==start_seq)
             {
-                // memset(buffer, 0, sizeof(buffer));
-
-                //tv.tv_sec = 1;
-                setsockopt(listen_sockfd, SOL_SOCKET, SO_RCVTIMEO, (struct timeval *)&tv, sizeof(tv)); 
+                memset(buffer, 0, sizeof(buffer));
+            
                 // slide window
                 start_seq = next_seq[start_seq];
-                for(int i = 0; i<window_size-1;i++)
+                for(int i = 0; i<valid_size-1;i++)
                 {
                     packets_in_window[i] = packets_in_window[i+1];
                 }
                 valid_size -= 1;
-                printf("right ack: %d, next starting seq:%d\n", ack_pkt.acknum, start_seq);
-
-                // set timer
-                // setsockopt(listen_sockfd, SOL_SOCKET, SO_RCVTIMEO, (struct timeval *)&tv, sizeof(tv)); 
-
-
+    
                 // only create last packet once
                 // TODO: num_packets==0?
 
                 // keep reading and sending if more is available
+                //printf("curr seq:%d", seq_num);
                 if (num_packets>0)
                 {
                     bytes_read = fread(buffer, 1, PAYLOAD_SIZE, fp);
+                    //printf(buffer);
                     build_packet(&pkt, seq_num, ack_num, last, ack, bytes_read, (const char*) buffer);
 
                     packets_in_window[window_size-1] = pkt;
                     valid_size += 1;
-                    //memset(buffer, 0, sizeof(buffer));
             
                     bytes_sent = sendto(send_sockfd, (void *) &pkt, sizeof(pkt), 0, (struct sockaddr*)&server_addr_to, sizeof(server_addr_to));
-                    //tv.tv_sec = TIMEOUT;
-                    printf("bytes_send: %d seq:%d\n",bytes_sent,seq_num);
+                    //printf("bytes_send: %d seq:%d\n",bytes_sent,seq_num);
 
                     // increment seq num                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
                     seq_num = next_seq[seq_num];
-                } else {
+                } else if (num_packets==0) {
                     bytes_read = fread(buffer,1,PAYLOAD_SIZE,fp);
                     buffer[bytes_read]='\0';
                     //printf(buffer);
-                    printf("last packet read\nbytes_read:%d\n", bytes_read);
+                    printf("last packet read, seq num: %d\nbytes_read:%d\n", seq_num, bytes_read);
                     empty = true;
                     
                     build_packet(&pkt, seq_num, ack_num, 't', ack, bytes_read+1, (const char*) buffer);
+                    packets_in_window[window_size-1] = pkt;
+                    valid_size += 1;
                     sendto(send_sockfd, (void *) &pkt, sizeof(pkt), 0, (struct sockaddr*)&server_addr_to, sizeof(server_addr_to));
                     //tv.tv_sec = TIMEOUT;
                     //printf(pkt.payload);
                     //printf(pkt.last);
                 }
                 num_packets -= 1;
+                // reset timer
+                startTime = setStartTime();
+
+                //printf("right ack: %d, next starting seq:%d, validsize:%d\n", ack_pkt.acknum, start_seq, valid_size);
             }
             else{
-                printf("ack received: %d, current starting seq: %d\n", ack_pkt.acknum, start_seq);
-                //tv.tv_sec = TIMEOUT;
+                //printf("wrong ack received: %d, current starting seq: %d\n", ack_pkt.acknum, start_seq);
             }
         }
-        delay(1);
+        // if timeout, resend
+        else if(timeout(startTime))
+        {
+            //printf("timeout, validsize:%d\n", valid_size);
+            for(int i = 0; i<valid_size; i++)
+            {
+                struct packet p = packets_in_window[i];
+                //printf(pkt.payload);
+    
+                //delay(1);
+                bytes_sent = sendto(send_sockfd, (void *) &p, sizeof(p), 0, (struct sockaddr*)&server_addr_to, sizeof(server_addr_to));
+                startTime = setStartTime();
+                //printf("timeout!!bytes_send: %d seq:%d windowsize:%d validsize:%d\n",bytes_sent,p.seqnum, window_size,valid_size);
+            }
+        }
+        //delay(1);
         
     }
 }

@@ -76,7 +76,7 @@ int main() {
                 // memcpy(payload, pkt.payload, length);
 
                 //printf("bytes write: %d\n", bytes_write);
-                printf(pkt.payload);
+                //printf(pkt.payload);
                 
                 // send ack number back 
                 if(pkt.last=='t')
@@ -86,7 +86,7 @@ int main() {
                     ack_pkt.acknum = pkt.seqnum;
                     prev_ack = ack_pkt.acknum;
                     sendto(send_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0, &client_addr_to, sizeof(client_addr_to));
-                    printf("last packet\n");
+                    //printf("last packet\n");
                     fclose(fp);
                     close(listen_sockfd);
                     close(send_sockfd);
@@ -104,13 +104,13 @@ int main() {
                 //sendto(send_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0, &client_addr_to, sizeof(client_addr_to));
 
                 // send most recent seq as ack
-                printf("bad seq number: %d,expect: %d\n", pkt.seqnum,next_ack[prev_ack]);
+                //printf("bad seq number: %d,expect: %d\n", pkt.seqnum,next_ack[prev_ack]);
                 ack_pkt.acknum = pkt.seqnum;
                 sendto(send_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0, &client_addr_to, sizeof(client_addr_to));
 
             }
         }
-        delay(1);
+        //delay(1);
         //buffer[bytes_read] = '\0';
         //close(client_socket);
         

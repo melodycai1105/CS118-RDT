@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <sys/time.h>
 
 
 // MACROS
@@ -15,16 +16,16 @@
 #define CLIENT_PORT_TO 5001
 #define PAYLOAD_SIZE 1024
 #define WINDOW_SIZE 4
-#define TIMEOUT 2
+#define TIMEOUT 0.1
 #define MAX_SEQUENCE 1024
 
 
 // ack number next
-int next_ack[] = {1,2,3,0};
+int next_ack[] = {1,2,3,4,5,0};
 int prev_ack = -1;
 
 // window size
-int window_size = 3;
+int window_size = 5;
 
 // Packet Layout
 // You may change this if you want to
@@ -71,5 +72,21 @@ void delay(int number_of_seconds)
     // looping till required time is not achieved
     while (clock() < start_time + milli_seconds);
 }
+
+// set timer
+double setStartTime(){
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return tv.tv_sec + tv.tv_usec/1000000;
+}
+
+// check timeout
+int timeout(double startTime){
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    double currTime = tv.tv_sec + tv.tv_usec/1000000;
+    return (currTime-startTime > TIMEOUT);
+}
+
 
 #endif
