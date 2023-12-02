@@ -139,7 +139,7 @@ int main(int argc, char *argv[]) {
     // set dup ack for fast retransmit
     int dupAckCount = 0;
     int dupAck = -1;
-    int last_ack = -1;
+    int last_ack = 0;
 
     // set count for number of packets received for congestion avoidance
     int pack_recv = 0;
@@ -163,10 +163,16 @@ int main(int argc, char *argv[]) {
             if(ack_pkt.acknum==last_ack)
             {
                 dupAckCount += 1;
+                // fast recovery on duplicate ack
+                if(STATE==FAST_RETRANSMIT) 
+                {
+                    cwnd += 1;
+                }
             }
             else
             {
                 dupAckCount = 0;
+                // fast recovery on unacked pkt
                 if(STATE==FAST_RETRANSMIT)
                 {
                     STATE = SLOW_START;
@@ -184,10 +190,33 @@ int main(int argc, char *argv[]) {
             if(STATE==FAST_RETRANSMIT)
             {
                 // retransmit packet with dupAck, use relative positition of curr start seq and returned ack to get that packet
+                if (dupAckCount == 3){
+                    curr_pkt = packets_window[dupAck];
+                    // reset the timer?
+                    startTime = setStartTime();
+                    change_packet_start_time(&curr_pkt, startTime);
+                    bytes_sent = sendto(send_sockfd, (void *) &pkt, sizeof(pkt), 0, (struct sockaddr*)&server_addr_to, sizeof(server_addr_to));
 
-                // reset ssthresh and cwnd
-                ssthresh = MAX(cwnd/2, 2);
-                cwnd = ssthresh + 3;
+                    // reset ssthresh and cwnd
+                    ssthresh = MAX(cwnd/2, 2);
+                    cwnd = ssthresh + 3;
+                }
+                // change the window range
+                start_seq = dupAck;
+                end_seq = start_seq + (cwnd - 1);
+                if (end_seq >= num_packets){
+                    end_seq = num_packets - 1;
+                }
+
+                if (seq_num >= start_seq && seq_num <= end_seq){
+                    for(int i = seq_num; i <= end_seq; i ++ ){
+                        curr_pkt = packets_window[i];
+                        startTime = setStartTime();
+                        change_packet_start_time(&pkt, startTime);
+                        bytes_sent = sendto(send_sockfd, (void *) &pkt, sizeof(pkt), 0, (struct sockaddr*)&server_addr_to, sizeof(server_addr_to));
+                    }
+                    seq_num = end_seq + 1;
+                }
             }
             else if(ack_pkt.acknum > start_seq)
             {
@@ -197,6 +226,9 @@ int main(int argc, char *argv[]) {
                     // TODO: create 2 packets and send + reset timer
                     start_seq = ack_pkt.acknum;
                     end_seq = start_seq + (cwnd - 1);
+                    if (end_seq >= num_packets){
+                        end_seq = num_packets - 1;
+                    }
                     
                     if (seq_num >= start_seq && seq_num <= end_seq){
                         for(int i = seq_num; i <= end_seq; i ++ ){
@@ -205,6 +237,7 @@ int main(int argc, char *argv[]) {
                             change_packet_start_time(&pkt, startTime);
                             bytes_sent = sendto(send_sockfd, (void *) &pkt, sizeof(pkt), 0, (struct sockaddr*)&server_addr_to, sizeof(server_addr_to));
                         }
+                        seq_num = end_seq + 1;
                     }
                     // end of TODO
                     if(cwnd>ssthresh)
@@ -220,20 +253,56 @@ int main(int argc, char *argv[]) {
                     {
                         cwnd += 1;
                         // TODO: create packet and send + reset timer
-
                     }
                     // TODO: create packet and send + reset timer
-
+                    start_seq = ack_pkt.acknum;
+                    end_seq = start_seq + (cwnd - 1);
+                    if (end_seq >= num_packets){
+                        end_seq = num_packets - 1;
+                    }
+                    
+                    if (seq_num >= start_seq && seq_num <= end_seq){
+                        for(int i = seq_num; i <= end_seq; i ++ ){
+                            curr_pkt = packets_window[i];
+                            startTime = setStartTime();
+                            change_packet_start_time(&pkt, startTime);
+                            bytes_sent = sendto(send_sockfd, (void *) &pkt, sizeof(pkt), 0, (struct sockaddr*)&server_addr_to, sizeof(server_addr_to));
+                        }
+                        seq_num = end_seq + 1;
+                    }
                 }
             }
             last_ack = ack_pkt.acknum;
-
         }
-        else if(timeout(startTime))
+        else if(timeout(packets_window[start_seq].starttime))
         {
+            ssthresh = MAX(cwnd/2, 2);
+            cwnd = 1;
+            // retransmit lost packet
+            curr_pkt = packets_window[start_seq];
+            // reset the timer?
+            startTime = setStartTime();
+            change_packet_start_time(&curr_pkt, startTime);
+            bytes_sent = sendto(send_sockfd, (void *) &pkt, sizeof(pkt), 0, (struct sockaddr*)&server_addr_to, sizeof(server_addr_to));
 
+            // change the current window range
+            end_seq = start_seq + (cwnd - 1);
+            if (end_seq >= num_packets){
+                end_seq = num_packets - 1;
+            }
+            
+            if (seq_num >= start_seq && seq_num <= end_seq){
+                for(int i = seq_num; i <= end_seq; i ++ ){
+                    curr_pkt = packets_window[i];
+                    startTime = setStartTime();
+                    change_packet_start_time(&pkt, startTime);
+                    bytes_sent = sendto(send_sockfd, (void *) &pkt, sizeof(pkt), 0, (struct sockaddr*)&server_addr_to, sizeof(server_addr_to));
+                }
+                seq_num = end_seq + 1;
+            }
+
+            STATE = SLOW_START;
         }
-
     }
 }
     

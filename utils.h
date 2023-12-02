@@ -31,11 +31,12 @@ enum state {
 
 // ack number next
 int next_ack[] = {1,2,3,4,5,0};
-int prev_ack = -1;
+int prev_ack = 0;
 
 // window size
 // congestion control: start with 1
 int window_size = 5;
+int server_window_size = 2000;
 
 // Packet Layout
 // You may change this if you want to
