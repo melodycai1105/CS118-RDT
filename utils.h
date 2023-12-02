@@ -16,7 +16,7 @@
 #define CLIENT_PORT_TO 5001
 #define PAYLOAD_SIZE 1024
 #define WINDOW_SIZE 4
-#define TIMEOUT 0.1
+#define TIMEOUT 1                                                                                                                                                                                                                                                                       
 #define MAX_SEQUENCE 1024
 #define MAX(a,b) (((a)>=(b))?(a):(b))
 
@@ -100,9 +100,9 @@ double setStartTime(){
 
 // check timeout
 int timeout(double startTime){
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    double currTime = tv.tv_sec + tv.tv_usec/1000000;
+    struct timeval new_tv;
+    gettimeofday(&new_tv, NULL);
+    double currTime = new_tv.tv_sec + new_tv.tv_usec/1000000;
     return (currTime-startTime > TIMEOUT);
 }
 

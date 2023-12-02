@@ -67,12 +67,10 @@ int main() {
         struct packet pkt;
 
         if (bytes_read = recvfrom(listen_sockfd, (void *) &pkt, sizeof(pkt), 0, (struct sockaddr*)&server_addr, &addr_size) > 0) {
-            
             //printRecv(&pkt);
             //printf("last char: %c", pkt.last);
-
             // if seq number is prev_ack's next or starting new file
-            if(prev_ack==0 && pkt.seqnum==0 || pkt.seqnum == prev_ack)
+            if(pkt.seqnum == prev_ack)
             {
                 printf("good seq number: %d\n", pkt.seqnum);
                 receive_base = prev_ack;
@@ -82,26 +80,29 @@ int main() {
                     cur_packet = server_packets_window[receive_base];
                     if(cur_packet.last)
                     {
-                        fwrite(pkt.payload, 1, pkt.length, fp);
+                        fwrite(cur_packet.payload, 1, cur_packet.length, fp);
                         ack_pkt.last= 1;
                         ack_pkt.acknum = receive_base + 1;
                         prev_ack = receive_base + 1;
                         sendto(send_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0, &client_addr_to, sizeof(client_addr_to));
-                        //printf("last packet\n");
+                        printf("last ack packet with ack num %d\n", ack_pkt.acknum);
                         fclose(fp);
                         close(listen_sockfd);
                         close(send_sockfd);
                         return EXIT_SUCCESS;
                     }
-                    fwrite(pkt.payload, 1, pkt.length, fp);
+                    fwrite(cur_packet.payload, 1, cur_packet.length, fp);
+                    // printf("content write: %d\n", cur_packet.length);
                     receive_base += 1;
+                    printf("ack num: %d\n", receive_base);
                 }
-                ack_pkt.acknum = receive_base + 1;
-                prev_ack = receive_base + 1;
+                ack_pkt.acknum = receive_base;
+                prev_ack = receive_base;
                 sendto(send_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0, &client_addr_to, sizeof(client_addr_to));
             }
             // congestion control: not in order, buffer
             else{
+                // printf("wrong seq num: %d\n", pkt.seqnum);
                 ooo_seq_num = pkt.seqnum;
                 received[ooo_seq_num] = 1;
                 server_packets_window[ooo_seq_num] = pkt;
@@ -111,13 +112,14 @@ int main() {
                 // send most recent seq as ack
                 //printf("bad seq number: %d,expect: %d\n", pkt.seqnum,next_ack[prev_ack]);
                 ack_pkt.acknum = prev_ack;
+                printf("ack num: %d with wrong seq num: %d\n", prev_ack, pkt.seqnum);
                 sendto(send_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0, &client_addr_to, sizeof(client_addr_to));
             }
-        }
+        // }
         //delay(1);
         //buffer[bytes_read] = '\0';
         //close(client_socket);
-
+        }
     }   
     // fwrite('\0', 1, 1, fp);
     // fclose(fp);
