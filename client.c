@@ -9,6 +9,7 @@
 
 #include "utils.h"
 
+
 int main(int argc, char *argv[]) {
     int listen_sockfd, send_sockfd;
     struct sockaddr_in client_addr, server_addr_to, server_addr_from;
@@ -21,7 +22,7 @@ int main(int argc, char *argv[]) {
     unsigned short ack_num = 0;
     char last = 0;
     char ack = 0;
-    int next_seq [] = {1,2,3,4,5,0};
+    // int next_seq [] = {1,2,3,4,5,0};
     double startTime;
     enum state STATE = SLOW_START;
 
@@ -78,17 +79,10 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    // TODO: Read from file, and initiate reliable data transfer to the server
+    // // TODO: Read from file, and initiate reliable data transfer to the server
     ssize_t bytes_read;
     ssize_t bytes_sent;
     ssize_t bytes_received;
-
-
-    // BATCH: declare window size, start and end pointer
-    int valid_size = 0;
-    unsigned short start_seq = 0;
-    unsigned short last_seq = -1;
-    bool empty = false;
 
     // BATCH: get total file len, file remainder size
     long int len;
@@ -100,10 +94,43 @@ int main(int argc, char *argv[]) {
     }
 
     long int last_packet_len = len % PAYLOAD_SIZE;
-    long int num_packets = len/PAYLOAD_SIZE; //+ (len % PAYLOAD_SIZE != 0);
-    //printf("last packet len: %d, num of packets:%d", last_packet_len,num_packets);
+    long int num_packets = len/PAYLOAD_SIZE + (len % PAYLOAD_SIZE != 0);
+    printf("last packet len: %d, num of packets:%d\n", last_packet_len, num_packets);
+
+
     close(fp);
     fp = fopen(filename, "rb");
+    
+    struct packet packets_window[num_packets];
+    while((bytes_read = fread(buffer, 1, PAYLOAD_SIZE, fp))> 0){
+        if (bytes_read < PAYLOAD_SIZE){
+            last = 1;
+        }
+
+        build_packet(&pkt, seq_num, ack_num, last, ack, bytes_read, (const char*) buffer);
+        packets_window[seq_num] = pkt;
+        seq_num += 1;
+    }   
+    close(fp);
+
+    // test if the file in packets_window is correct
+    // struct packet current_pkt;
+    // FILE *wfp = fopen("output.txt", "wb");
+    // for (int i = 0; i < num_packets; i ++){
+    //     current_pkt = packets_window[i];
+    //     fwrite(current_pkt.payload, 1, current_pkt.length, wfp);
+    //     if(current_pkt.last)
+    //     {
+    //         fclose(wfp);
+    //         return EXIT_SUCCESS;
+    //     }
+    // }
+
+    // BATCH: declare window size, start and end pointer
+    int valid_size = 0;
+    unsigned short start_seq = 0;
+    unsigned short end_seq = cwnd - 1;
+    bool empty = false;
 
     // set listen socket as non blocking
     fcntl(listen_sockfd, F_SETFL, O_NONBLOCK);
@@ -117,16 +144,20 @@ int main(int argc, char *argv[]) {
     // set count for number of packets received for congestion avoidance
     int pack_recv = 0;
 
-    // send first packet
-    num_packets -= 1;
-    bytes_read = fread(buffer, 1, PAYLOAD_SIZE, fp);
-    build_packet(&pkt, seq_num, ack_num, last, ack, bytes_read, (const char*) buffer);
-    bytes_sent = sendto(send_sockfd, (void *) &pkt, sizeof(pkt), 0, (struct sockaddr*)&server_addr_to, sizeof(server_addr_to));
-    startTime = setStartTime();
-
+    // send first set of packets
+    // num_packets -= 1;
+    // bytes_read = fread(buffer, 1, PAYLOAD_SIZE, fp);
+    struct packet curr_pkt;
+    for (int i = start_seq; i <= end_seq; i ++){
+        curr_pkt = packets_window[i];
+        startTime = setStartTime();
+        change_packet_start_time(&pkt, startTime);
+        bytes_sent = sendto(send_sockfd, (void *) &pkt, sizeof(pkt), 0, (struct sockaddr*)&server_addr_to, sizeof(server_addr_to));
+    }
+    
     while(1)
     {
-        if (bytes_received = recvfrom(listen_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0, (struct sockaddr*)&client_addr, &addr_size)>0)
+        if ((bytes_received = recvfrom(listen_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0, (struct sockaddr*)&client_addr, &addr_size))>0)
         {
             // check duplicate ack
             if(ack_pkt.acknum==last_ack)
@@ -155,18 +186,27 @@ int main(int argc, char *argv[]) {
                 // retransmit packet with dupAck, use relative positition of curr start seq and returned ack to get that packet
 
                 // reset ssthresh and cwnd
-                ssthresh = max(cwnd/2, 2);
+                ssthresh = MAX(cwnd/2, 2);
                 cwnd = ssthresh + 3;
             }
-            else if(ack_pkt.acknum==start_seq)
+            else if(ack_pkt.acknum > start_seq)
             {
                 if(STATE == SLOW_START)
                 {
                     cwnd += 1;
-
                     // TODO: create 2 packets and send + reset timer
-                 
-
+                    start_seq = ack_pkt.acknum;
+                    end_seq = start_seq + (cwnd - 1);
+                    
+                    if (seq_num >= start_seq && seq_num <= end_seq){
+                        for(int i = seq_num; i <= end_seq; i ++ ){
+                            curr_pkt = packets_window[i];
+                            startTime = setStartTime();
+                            change_packet_start_time(&pkt, startTime);
+                            bytes_sent = sendto(send_sockfd, (void *) &pkt, sizeof(pkt), 0, (struct sockaddr*)&server_addr_to, sizeof(server_addr_to));
+                        }
+                    }
+                    // end of TODO
                     if(cwnd>ssthresh)
                     {
                         STATE = CONGESTION_AVOIDANCE;
@@ -195,6 +235,7 @@ int main(int argc, char *argv[]) {
         }
 
     }
+}
     
 
 

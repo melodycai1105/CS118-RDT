@@ -18,6 +18,7 @@
 #define WINDOW_SIZE 4
 #define TIMEOUT 0.1
 #define MAX_SEQUENCE 1024
+#define MAX(a,b) (((a)>=(b))?(a):(b))
 
 // congestion control states
 enum state {
@@ -49,14 +50,18 @@ struct packet {
 };
 
 // Utility function to build a packet
-void build_packet(struct packet* pkt, unsigned short seqnum, unsigned short acknum, char last, char ack,unsigned int length, const char* payload, double starttime) {
+void build_packet(struct packet* pkt, unsigned short seqnum, unsigned short acknum, char last, char ack,unsigned int length, const char* payload) {
     pkt->seqnum = seqnum;
     pkt->acknum = acknum;
     pkt->ack = ack;
     pkt->last = last;
     pkt->length = length;
-    pkt->starttime = starttime;
+    pkt->starttime = 0;
     memcpy(pkt->payload, payload, length);
+}
+
+void change_packet_start_time(struct packet* pkt, double starttime) {
+    pkt->starttime = starttime;
 }
 
 // Utility function to print a packet
@@ -83,6 +88,7 @@ void delay(int number_of_seconds)
     // looping till required time is not achieved
     while (clock() < start_time + milli_seconds);
 }
+
 
 // set timer
 double setStartTime(){
