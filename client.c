@@ -23,8 +23,11 @@ int main(int argc, char *argv[]) {
     char ack = 0;
     int next_seq [] = {1,2,3,4,5,0};
     double startTime;
-    // int next_ack [] = {0, 1, 2, };
-    // int prev_seq [] = {3, 0, 1, 2};
+    enum state STATE = SLOW_START;
+
+    // congestion control window and slow start thresh
+    int cwnd = 1;
+    int ssthresh = 6;
 
     // read filename from command line argument
     if (argc != 2) {
@@ -102,6 +105,102 @@ int main(int argc, char *argv[]) {
     close(fp);
     fp = fopen(filename, "rb");
 
+    // set listen socket as non blocking
+    fcntl(listen_sockfd, F_SETFL, O_NONBLOCK);
+
+/* CONGESTION CONTROL*/
+    // set dup ack for fast retransmit
+    int dupAckCount = 0;
+    int dupAck = -1;
+    int last_ack = -1;
+
+    // set count for number of packets received for congestion avoidance
+    int pack_recv = 0;
+
+    // send first packet
+    num_packets -= 1;
+    bytes_read = fread(buffer, 1, PAYLOAD_SIZE, fp);
+    build_packet(&pkt, seq_num, ack_num, last, ack, bytes_read, (const char*) buffer);
+    bytes_sent = sendto(send_sockfd, (void *) &pkt, sizeof(pkt), 0, (struct sockaddr*)&server_addr_to, sizeof(server_addr_to));
+    startTime = setStartTime();
+
+    while(1)
+    {
+        if (bytes_received = recvfrom(listen_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0, (struct sockaddr*)&client_addr, &addr_size)>0)
+        {
+            // check duplicate ack
+            if(ack_pkt.acknum==last_ack)
+            {
+                dupAckCount += 1;
+            }
+            else
+            {
+                dupAckCount = 0;
+                if(STATE==FAST_RETRANSMIT)
+                {
+                    STATE = SLOW_START;
+                    cwnd += 1;
+                }
+            }
+
+            // if three duplicated acks, go to fast retransimit
+            if(dupAckCount==3)
+            {
+                STATE = FAST_RETRANSMIT;
+                dupAck = last_ack;
+            }
+
+            if(STATE==FAST_RETRANSMIT)
+            {
+                // retransmit packet with dupAck, use relative positition of curr start seq and returned ack to get that packet
+
+                // reset ssthresh and cwnd
+                ssthresh = max(cwnd/2, 2);
+                cwnd = ssthresh + 3;
+            }
+            else if(ack_pkt.acknum==start_seq)
+            {
+                if(STATE == SLOW_START)
+                {
+                    cwnd += 1;
+
+                    // TODO: create 2 packets and send + reset timer
+                 
+
+                    if(cwnd>ssthresh)
+                    {
+                        STATE = CONGESTION_AVOIDANCE;
+                    }
+                }
+                else if(STATE == CONGESTION_AVOIDANCE)
+                {
+                    // cwnd +=1 for every RTT
+                    pack_recv += 1;
+                    if(pack_recv==cwnd)
+                    {
+                        cwnd += 1;
+                        // TODO: create packet and send + reset timer
+
+                    }
+                    // TODO: create packet and send + reset timer
+
+                }
+            }
+            last_ack = ack_pkt.acknum;
+
+        }
+        else if(timeout(startTime))
+        {
+
+        }
+
+    }
+    
+
+
+/* GO BACK N*/
+/*
+
     // BATCH: construct and send initial array of packets 
     struct packet packets_in_window[window_size];
     for(int i = 0; i<window_size; i++)
@@ -149,13 +248,7 @@ int main(int argc, char *argv[]) {
         //printf("index:%d\n", i);
     }
     
-    // fd set
-    fd_set read_fds;
-    FD_ZERO(&read_fds);
-    FD_SET(listen_sockfd, &read_fds);
 
-    // set listen socket as non blocking
-    fcntl(listen_sockfd, F_SETFL, O_NONBLOCK);
 
     while (1){
 
@@ -251,3 +344,4 @@ int main(int argc, char *argv[]) {
         
     }
 }
+*/

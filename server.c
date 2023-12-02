@@ -99,6 +99,7 @@ int main() {
                 prev_ack = ack_pkt.acknum;
                 sendto(send_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0, &client_addr_to, sizeof(client_addr_to));
             }
+            // congestion control: not in order, buffer
             else{
                 // send previous ack number back 
                 //sendto(send_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0, &client_addr_to, sizeof(client_addr_to));

@@ -19,12 +19,21 @@
 #define TIMEOUT 0.1
 #define MAX_SEQUENCE 1024
 
+// congestion control states
+enum state {
+  SLOW_START,
+  CONGESTION_AVOIDANCE,
+  FAST_RETRANSMIT,
+  RETRANSMIT_TIMEOUT
+};
+
 
 // ack number next
 int next_ack[] = {1,2,3,4,5,0};
 int prev_ack = -1;
 
 // window size
+// congestion control: start with 1
 int window_size = 5;
 
 // Packet Layout
@@ -36,15 +45,17 @@ struct packet {
     char last; // 1byte
     unsigned int length; // 4bytes 
     char payload[PAYLOAD_SIZE];  // 1024 byres
+    double starttime;
 };
 
 // Utility function to build a packet
-void build_packet(struct packet* pkt, unsigned short seqnum, unsigned short acknum, char last, char ack,unsigned int length, const char* payload) {
+void build_packet(struct packet* pkt, unsigned short seqnum, unsigned short acknum, char last, char ack,unsigned int length, const char* payload, double starttime) {
     pkt->seqnum = seqnum;
     pkt->acknum = acknum;
     pkt->ack = ack;
     pkt->last = last;
     pkt->length = length;
+    pkt->starttime = starttime;
     memcpy(pkt->payload, payload, length);
 }
 
