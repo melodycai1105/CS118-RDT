@@ -168,8 +168,17 @@ int main(int argc, char *argv[]) {
     
     // set listen socket as non blocking
     fcntl(listen_sockfd, F_SETFL, O_NONBLOCK);
+    int timeout_count = 0;
     while(1){
+        // if (start_seq == num_packets-1){
+        //     delay(4);
+        //     close(fp);
+        //     close(listen_sockfd);
+        //     close(send_sockfd);
+        //     return EXIT_SUCCESS;
+        // }
         if (bytes_received = recvfrom(listen_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0, (struct sockaddr*)&client_addr, &addr_size)>0){
+            timeout_count = 0;
             printf("ack num %d received\n", ack_pkt.acknum);
             if (ack_pkt.last){
                 printf("last packet acked, acknum:%d \n", ack_pkt.acknum);
@@ -178,8 +187,66 @@ int main(int argc, char *argv[]) {
                 close(send_sockfd);
                 return EXIT_SUCCESS;
             }
-            if(ack_pkt.acknum > start_seq)
+
+            if(ack_pkt.acknum==last_ack)
             {
+                dupAckCount += 1;
+                // fast recovery on duplicate ack
+                if(STATE==FAST_RETRANSMIT) 
+                {
+                    cwnd += 1;
+                }
+            } else {
+                dupAckCount = 0;
+                // fast recovery on unacked pkt
+                if(STATE==FAST_RETRANSMIT)
+                {
+                    STATE = SLOW_START;
+                    cwnd += 1;
+                }
+            }
+
+            // if three duplicated acks, go to fast retransimit
+            if(dupAckCount==3)
+            {
+                STATE = FAST_RETRANSMIT;
+                dupAck = last_ack;
+            }
+
+            if(STATE==FAST_RETRANSMIT)
+            {
+                // retransmit packet with dupAck, use relative positition of curr start seq and returned ack to get that packet
+                if (dupAckCount == 3){
+                    curr_pkt = packets_window[dupAck];
+                    // reset the timer?
+                    startTime = setStartTime();
+                    change_packet_start_time(&curr_pkt, startTime);
+                    bytes_sent = sendto(send_sockfd, (void *) &curr_pkt, sizeof(curr_pkt), 0, (struct sockaddr*)&server_addr_to, sizeof(server_addr_to));
+                    packets_window[dupAck] = curr_pkt;
+
+                    // reset ssthresh and cwnd
+                    ssthresh = MAX(cwnd/2, 2);
+                    cwnd = ssthresh + 3;
+                }
+                // change the window range
+                start_seq = dupAck;
+                end_seq = start_seq + (cwnd - 1);
+                if (end_seq >= num_packets){
+                    end_seq = num_packets - 1;
+                }
+
+                if (seq_num >= start_seq && seq_num <= end_seq){
+                    for(int i = seq_num; i <= end_seq; i ++ ){
+                        curr_pkt = packets_window[dupAck];
+                        // reset the timer?
+                        startTime = setStartTime();
+                        change_packet_start_time(&curr_pkt, startTime);
+                        bytes_sent = sendto(send_sockfd, (void *) &curr_pkt, sizeof(curr_pkt), 0, (struct sockaddr*)&server_addr_to, sizeof(server_addr_to));
+                        packets_window[dupAck] = curr_pkt;
+                    }
+                    seq_num = end_seq + 1;
+                }
+            } else if(ack_pkt.acknum > start_seq) {
                 if(STATE == SLOW_START)
                 {
                     cwnd += 1;
@@ -240,9 +307,16 @@ int main(int argc, char *argv[]) {
                 last_ack = ack_pkt.acknum;
             } 
         }
-        
         else if(timeout(packets_window[start_seq].starttime))
         {
+            timeout_count += 1;
+            if (timeout_count >= 3 && seq_num == num_packets){
+                printf("server might be closed\n");
+                close(fp);
+                close(listen_sockfd);
+                close(send_sockfd);
+                return EXIT_SUCCESS;
+            }
             ssthresh = MAX(cwnd/2, 2);
             cwnd = 1;
             // retransmit lost packet
@@ -251,6 +325,7 @@ int main(int argc, char *argv[]) {
             startTime = setStartTime();
             change_packet_start_time(&curr_pkt, startTime);
             bytes_sent = sendto(send_sockfd, (void *) &curr_pkt, sizeof(curr_pkt), 0, (struct sockaddr*)&server_addr_to, sizeof(server_addr_to));
+            printf("timeout! lost packet %d sent\n", curr_pkt.seqnum);
             packets_window[start_seq] = curr_pkt;
             // change the current window range
             end_seq = start_seq + (cwnd - 1);

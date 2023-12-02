@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdbool.h>
 
 #include "utils.h"
 
@@ -61,6 +62,8 @@ int main() {
     // Selective Repeat
     // Open the target file for writing (always write to output.txt)
     struct packet cur_packet;
+    // bool completed = false;
+
     FILE *fp = fopen("output.txt", "wb");
     while (1) {
         ssize_t bytes_read;
@@ -78,34 +81,41 @@ int main() {
                 server_packets_window[receive_base] = pkt;
                 while (receive_base < server_window_size && received[receive_base] == 1){
                     cur_packet = server_packets_window[receive_base];
+                    fwrite(cur_packet.payload, 1, cur_packet.length, fp);
                     if(cur_packet.last)
                     {
-                        fwrite(cur_packet.payload, 1, cur_packet.length, fp);
                         ack_pkt.last= 1;
-                        ack_pkt.acknum = receive_base + 1;
-                        prev_ack = receive_base + 1;
-                        sendto(send_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0, &client_addr_to, sizeof(client_addr_to));
-                        printf("last ack packet with ack num %d\n", ack_pkt.acknum);
-                        fclose(fp);
+                        printf("last ack packet with ack num %d\n",receive_base + 1);
+                        close(fp);
                         close(listen_sockfd);
                         close(send_sockfd);
                         return EXIT_SUCCESS;
+                        // completed = true;
                     }
-                    fwrite(cur_packet.payload, 1, cur_packet.length, fp);
                     // printf("content write: %d\n", cur_packet.length);
                     receive_base += 1;
-                    printf("ack num: %d\n", receive_base);
                 }
                 ack_pkt.acknum = receive_base;
                 prev_ack = receive_base;
                 sendto(send_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0, &client_addr_to, sizeof(client_addr_to));
+                printf("ack num: %d\n", ack_pkt.acknum);
             }
             // congestion control: not in order, buffer
             else{
                 // printf("wrong seq num: %d\n", pkt.seqnum);
-                ooo_seq_num = pkt.seqnum;
-                received[ooo_seq_num] = 1;
-                server_packets_window[ooo_seq_num] = pkt;
+                // if these packets are never seen, store them
+                // if (completed){
+                //     ack_pkt.last = 1;
+                //     ack_pkt.acknum = prev_ack;
+                //     sendto(send_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0, &client_addr_to, sizeof(client_addr_to));
+                // }
+
+                if (pkt.seqnum > prev_ack){
+                    ooo_seq_num = pkt.seqnum;
+                    received[ooo_seq_num] = 1;
+                    server_packets_window[ooo_seq_num] = pkt;
+                }
+
                 // send previous ack number back 
                 //sendto(send_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0, &client_addr_to, sizeof(client_addr_to));
 
