@@ -85,6 +85,7 @@ int main() {
                     if(cur_packet.last)
                     {
                         ack_pkt.last= 1;
+                        sendto(send_sockfd, (void *) &ack_pkt, sizeof(ack_pkt), 0, &client_addr_to, sizeof(client_addr_to));
                         printf("last ack packet with ack num %d\n",receive_base + 1);
                         close(fp);
                         close(listen_sockfd);

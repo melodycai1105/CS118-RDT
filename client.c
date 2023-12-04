@@ -95,7 +95,7 @@ int main(int argc, char *argv[]) {
 
     long int last_packet_len = len % PAYLOAD_SIZE;
     long int num_packets = len/PAYLOAD_SIZE + (len % PAYLOAD_SIZE != 0);
-    printf("last packet len: %d, num of packets:%d\n", last_packet_len, num_packets);
+    //printf("last packet len: %d, num of packets:%d\n", last_packet_len, num_packets);
 
 
     close(fp);
@@ -157,7 +157,7 @@ int main(int argc, char *argv[]) {
             startTime = setStartTime();
             change_packet_start_time(&curr_pkt, startTime);
             bytes_sent = sendto(send_sockfd, (void *) &curr_pkt, sizeof(curr_pkt), 0, (struct sockaddr*)&server_addr_to, sizeof(server_addr_to));
-            printf("regular packet %d sent\n", curr_pkt.seqnum);
+            //printf("regular packet %d sent\n", curr_pkt.seqnum);
             packets_window[i] = curr_pkt;
             // printf("this pkt start at %d\n", packets_window[i].starttime);
             // printf("%s", curr_pkt.payload);
@@ -181,7 +181,7 @@ int main(int argc, char *argv[]) {
             timeout_count = 0;
             printf("ack num %d received\n", ack_pkt.acknum);
             if (ack_pkt.last){
-                printf("last packet acked, acknum:%d \n", ack_pkt.acknum);
+                //printf("last packet acked, acknum:%d \n", ack_pkt.acknum);
                 close(fp);
                 close(listen_sockfd);
                 close(send_sockfd);
@@ -202,19 +202,24 @@ int main(int argc, char *argv[]) {
                 if(STATE==FAST_RETRANSMIT)
                 {
                     STATE = SLOW_START;
-                    cwnd += 1;
+                    cwnd = ssthresh;
+                    //cwnd += 1;
                 }
             }
+
+            last_ack = ack_pkt.acknum;
 
             // if three duplicated acks, go to fast retransimit
             if(dupAckCount==3)
             {
                 STATE = FAST_RETRANSMIT;
                 dupAck = last_ack;
+                pack_recv = 0;
             }
 
             if(STATE==FAST_RETRANSMIT)
             {
+                //printf("State: FAST RETRANSMIT\n");
                 // retransmit packet with dupAck, use relative positition of curr start seq and returned ack to get that packet
                 if (dupAckCount == 3){
                     curr_pkt = packets_window[dupAck];
@@ -228,6 +233,9 @@ int main(int argc, char *argv[]) {
                     ssthresh = MAX(cwnd/2, 2);
                     cwnd = ssthresh + 3;
                 }
+
+                printf("state: FAST RESTRANSMIT curr cwnd: %d\n", cwnd);
+
                 // change the window range
                 start_seq = dupAck;
                 end_seq = start_seq + (cwnd - 1);
@@ -235,21 +243,23 @@ int main(int argc, char *argv[]) {
                     end_seq = num_packets - 1;
                 }
 
+                // FAST RECOVERY
                 if (seq_num >= start_seq && seq_num <= end_seq){
                     for(int i = seq_num; i <= end_seq; i ++ ){
-                        curr_pkt = packets_window[dupAck];
-                        // reset the timer?
+                        curr_pkt = packets_window[i];
                         startTime = setStartTime();
                         change_packet_start_time(&curr_pkt, startTime);
                         bytes_sent = sendto(send_sockfd, (void *) &curr_pkt, sizeof(curr_pkt), 0, (struct sockaddr*)&server_addr_to, sizeof(server_addr_to));
-                        packets_window[dupAck] = curr_pkt;
+                        packets_window[i] = curr_pkt;
                     }
                     seq_num = end_seq + 1;
                 }
-            } else if(ack_pkt.acknum > start_seq) {
+            } 
+            else if(ack_pkt.acknum > start_seq) {
                 if(STATE == SLOW_START)
                 {
                     cwnd += 1;
+                    printf("state: SLOW START curr cwnd: %d\n", cwnd);
                     // TODO: create 2 packets and send + reset timer
                     start_seq = ack_pkt.acknum;
                     end_seq = start_seq + (cwnd - 1);
@@ -263,7 +273,7 @@ int main(int argc, char *argv[]) {
                             startTime = setStartTime();
                             change_packet_start_time(&curr_pkt, startTime);
                             bytes_sent = sendto(send_sockfd, (void *) &curr_pkt, sizeof(curr_pkt), 0, (struct sockaddr*)&server_addr_to, sizeof(server_addr_to));
-                            printf("regular packet %d sent\n", curr_pkt.seqnum);
+                            ("regular packet %d sent\n", curr_pkt.seqnum);
                             packets_window[i] = curr_pkt;
                             // printf("this pkt start at %d\n", packets_window[i].starttime);
                         }
@@ -278,12 +288,16 @@ int main(int argc, char *argv[]) {
                 else if(STATE == CONGESTION_AVOIDANCE)
                 {
                     // cwnd +=1 for every RTT
+                    // when to reset pack_recv?
                     pack_recv += 1;
                     if(pack_recv==cwnd)
                     {
                         cwnd += 1;
+                        pack_recv = 0;
                         // TODO: create packet and send + reset timer
                     }
+                    printf("state: CONGESTION CONTROL curr cwnd: %d pack recv:%d\n", cwnd, pack_recv);
+
                     // TODO: create packet and send + reset timer
                     start_seq = ack_pkt.acknum;
                     end_seq = start_seq + (cwnd - 1);
@@ -304,14 +318,14 @@ int main(int argc, char *argv[]) {
                         seq_num = end_seq + 1;
                     }
                 }
-                last_ack = ack_pkt.acknum;
             } 
         }
         else if(timeout(packets_window[start_seq].starttime))
         {
+            pack_recv = 0;
             timeout_count += 1;
             if (timeout_count >= 3 && seq_num == num_packets){
-                printf("server might be closed\n");
+                //printf("server might be closed\n");
                 close(fp);
                 close(listen_sockfd);
                 close(send_sockfd);
