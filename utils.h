@@ -16,7 +16,7 @@
 #define CLIENT_PORT_TO 5001
 #define PAYLOAD_SIZE 1024
 #define WINDOW_SIZE 4
-#define TIMEOUT 1                                                                                                                                                                                                                                                        
+#define TIMEOUT 0.8                                                                                                                                                                                                                                                       
 #define MAX_SEQUENCE 1024
 #define MAX(a,b) (((a)>=(b))?(a):(b))
 
@@ -24,8 +24,7 @@
 enum state {
   SLOW_START,
   CONGESTION_AVOIDANCE,
-  FAST_RETRANSMIT,
-  RETRANSMIT_TIMEOUT
+  FAST_RECOVERY
 };
 
 
@@ -95,15 +94,15 @@ void delay(int number_of_seconds)
 double setStartTime(){
     struct timeval tv;
     gettimeofday(&tv, NULL);
-    return tv.tv_sec + tv.tv_usec/1000000;
+    return tv.tv_sec + tv.tv_usec/1000000.0;
 }
 
 // check timeout
 int timeout(double startTime){
     struct timeval new_tv;
     gettimeofday(&new_tv, NULL);
-    double currTime = new_tv.tv_sec + new_tv.tv_usec/1000000;
-    return (currTime-startTime > TIMEOUT);
+    double currTime = new_tv.tv_sec + new_tv.tv_usec/1000000.0;
+    return (currTime-startTime >= TIMEOUT);
 }
 
 
